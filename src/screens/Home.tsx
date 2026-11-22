@@ -77,7 +77,7 @@ export default function Home() {
             <span className="display block text-[26px] font-bold">
               Continue session {active.type}
             </span>
-            <span className="text-[15px] font-medium opacity-90">
+            <span className="text-[15px] font-medium">
               {activeItem
                 ? exercises[activeItem.exerciseId]!.name
                 : active.index === 0
@@ -180,7 +180,7 @@ export default function Home() {
                   <span className="display block text-[26px] font-bold">
                     {sessions[t].subtitle}
                   </span>
-                  <span className="text-[15px] font-medium opacity-90">
+                  <span className="text-[15px] font-medium">
                     {last ? `Last done ${fmtDate(last)}` : 'Not done yet'}
                   </span>
                 </span>

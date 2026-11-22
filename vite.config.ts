@@ -15,7 +15,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff,woff2}'] },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg}', '**/*latin-*.woff2'] },
       manifest: {
         name: 'Winter Gym Block',
         short_name: 'Gym Block',
