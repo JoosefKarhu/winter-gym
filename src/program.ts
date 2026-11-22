@@ -62,6 +62,8 @@ export interface MainLiftPrescription {
 export interface Phase {
   n: 1 | 2 | 3 | 4
   name: string
+  /** Label for narrow places like chart bands. */
+  short: string
   /** [month 1-12, day]. Oct to Dec belong to the block start year, Jan to Mar to the next. */
   start: [number, number]
   end: [number, number]
@@ -673,6 +675,7 @@ export const phases: Phase[] = [
   {
     n: 1,
     name: 'Learn',
+    short: 'Learn',
     start: [10, 1],
     end: [11, 15],
     rir: '3 RIR',
@@ -688,6 +691,7 @@ export const phases: Phase[] = [
   {
     n: 2,
     name: 'Build',
+    short: 'Build',
     start: [11, 16],
     end: [12, 31],
     rir: '2 RIR',
@@ -703,6 +707,7 @@ export const phases: Phase[] = [
   {
     n: 3,
     name: 'Strength',
+    short: 'Strength',
     start: [1, 1],
     end: [2, 28],
     rir: '1 to 2 RIR',
@@ -718,6 +723,7 @@ export const phases: Phase[] = [
   {
     n: 4,
     name: 'Power and taper',
+    short: 'Taper',
     start: [3, 1],
     end: [3, 31],
     rir: '3 RIR',

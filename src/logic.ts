@@ -343,7 +343,7 @@ export function dayContext(date: string, blockStart: string, extraDeloadWeeks: n
 /** Calendar range of each phase inside the block, clipped to start at the block start. */
 export function phaseRanges(
   blockStart: string,
-): { n: number; name: string; from: string; to: string }[] {
+): { n: number; name: string; short: string; from: string; to: string }[] {
   const [y, m] = blockStart.split('-').map(Number)
   const year0 = m! >= 7 ? y! : y! - 1
   const iso = ([mm, dd]: [number, number]) =>
@@ -351,6 +351,7 @@ export function phaseRanges(
   return phases.map((p, i) => ({
     n: p.n,
     name: p.name,
+    short: p.short,
     from: i === 0 && blockStart > iso(p.start) ? blockStart : iso(p.start),
     to: iso(p.end),
   }))

@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme {
+  --font-sans: 'Barlow', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Barlow', sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-plate-a: var(--plate-a);
+  --color-plate-b: var(--plate-b);
+  --color-plate-c: var(--plate-c);
+  --color-on-plate-a: #fff;
+  --color-on-plate-b: #fff;
+  --color-on-plate-c: #141414;
+  --color-go: var(--go);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+}
+
+:root,
+[data-theme='dark'] {
+  --bg: #111111;
+  --surface: #1a1a1a;
+  --surface-2: #262626;
+  --line: #333332;
+  --ink: #f2f1ec;
+  --muted: #a6a59e;
+  --plate-a: #d7262e;
+  --plate-b: #2160d9;
+  --plate-c: #f5c400;
+  --go: #3ccf7e;
+  --warn: #f5c400;
+  --danger: #ff5a52;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f3f2ee;
+  --surface: #ffffff;
+  --surface-2: #e8e7e2;
+  --line: #d4d2cb;
+  --ink: #141414;
+  --muted: #5a5953;
+  --plate-a: #c81e26;
+  --plate-b: #1a55c9;
+  --plate-c: #f2c200;
+  --go: #13804a;
+  --warn: #8a6a00;
+  --danger: #c4261e;
+  color-scheme: light;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  overscroll-behavior-y: none;
+}
+::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+input,
+textarea,
+select {
+  font-size: 18px;
+  caret-color: var(--ink);
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+summary {
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
