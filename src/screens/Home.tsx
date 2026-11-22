@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, useActiveSession, useSessions, useSettings, type QuickLog } from '../db'
+import { db, saveSettings, useActiveSession, useSessions, useSettings, type QuickLog } from '../db'
 import { sessionSteps, dayContext, dayNumber, isoFromDay, mondayOf, todayIso } from '../logic'
-import { exercises, sessions, type SessionType } from '../program'
+import { HARD_MATCHES_FOR_DELOAD, exercises, sessions, type SessionType } from '../program'
 import { Badge, Icon, fmtDate, plate } from '../ui'
 import { go } from '../App'
 
@@ -71,6 +71,29 @@ export default function Home() {
           </p>
         )}
       </header>
+
+      {!ctx.deload &&
+        (quick ?? []).filter((q) => q.kind === 'squash').length >= HARD_MATCHES_FOR_DELOAD && (
+          <div role="status" className="mb-5 rounded-2xl border-2 border-warn p-4">
+            <p className="display text-[22px] font-bold">
+              {(quick ?? []).filter((q) => q.kind === 'squash').length} squash matches this week
+            </p>
+            <p className="mt-1 text-[15px]">
+              Your program makes this an extra deload week: A and B drop to 2 sets, about 10 percent
+              lighter.
+            </p>
+            <button
+              onClick={() =>
+                saveSettings({
+                  extraDeloadWeeks: [...settings.extraDeloadWeeks, ctx.week].sort((a, b) => a - b),
+                })
+              }
+              className="mt-3 h-14 w-full rounded-xl bg-plate-c font-bold text-on-plate-c"
+            >
+              Make week {ctx.week} a deload week
+            </button>
+          </div>
+        )}
 
       {active && (
         <a

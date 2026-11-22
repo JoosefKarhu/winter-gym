@@ -98,3 +98,35 @@ test('a session can be kept for later or cancelled', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Week/ })).toBeVisible()
   await expect(page.getByText('Continue session C')).toHaveCount(0)
 })
+
+test('history counts squash and simulator, in date order', async ({ page }) => {
+  await setup(page)
+  await page.goto('/#/history')
+  const stat = (label: string) => page.locator('dt', { hasText: label }).locator('xpath=../dd')
+  await expect(stat('Squash this week')).toHaveText('1')
+  await expect(stat('Simulator this week')).toHaveText('2')
+  await expect(
+    page.getByRole('listitem', { name: /Week 8: 1 gym, 1 squash, 2 simulator/ }),
+  ).toBeVisible()
+  // Newest first: Wed sim, Tue squash, then Monday's session A before Monday's sim.
+  const rows = page
+    .getByRole('heading', { name: 'Activity' })
+    .locator('xpath=following-sibling::ul[1]/li')
+  await expect(rows.nth(0)).toContainText('Golf simulator')
+  await expect(rows.nth(0)).toContainText('Wed 25 Nov')
+  await expect(rows.nth(1)).toContainText('Squash match')
+  await expect(rows.nth(2)).toContainText('Mon 23 Nov')
+  await expect(rows.nth(3)).toContainText('Golf simulator')
+})
+
+test('a second squash match offers an extra deload week', async ({ page }) => {
+  await setup(page)
+  await page.goto('/#/')
+  await expect(page.getByText(/squash matches this week/)).toHaveCount(0)
+  await page.getByRole('button', { name: /Wed 25 Nov: \d logged/ }).click()
+  await page.getByRole('button', { name: /Squash/ }).click()
+  await expect(page.getByText('2 squash matches this week')).toBeVisible()
+  await page.getByRole('button', { name: 'Make week 8 a deload week' }).click()
+  await expect(page.getByText('Deload', { exact: true })).toBeVisible()
+  await expect(page.getByText(/squash matches this week/)).toHaveCount(0)
+})

@@ -301,14 +301,21 @@ export function timesDone(history: SessionLog[], exerciseId: string): number {
   return history.filter((s) => s.status === 'done' && findExercise(s, exerciseId)).length
 }
 
-export function sessionsPerWeek(history: SessionLog[], blockStart: string): Map<number, number> {
+/** How many dates fall in each block week. */
+export function countPerWeek(dates: string[], blockStart: string): Map<number, number> {
   const m = new Map<number, number>()
-  for (const s of history) {
-    if (s.status !== 'done') continue
-    const w = blockWeek(s.date, blockStart)
+  for (const d of dates) {
+    const w = blockWeek(d, blockStart)
     m.set(w, (m.get(w) ?? 0) + 1)
   }
   return m
+}
+
+export function sessionsPerWeek(history: SessionLog[], blockStart: string): Map<number, number> {
+  return countPerWeek(
+    history.filter((s) => s.status === 'done').map((s) => s.date),
+    blockStart,
+  )
 }
 
 /** Consecutive block weeks with 3+ gym sessions, ending this week (if already 3) or last week. */

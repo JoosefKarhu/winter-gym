@@ -8,6 +8,7 @@ import {
   referenceLog,
   roundLoad,
   sessionsPerWeek,
+  countPerWeek,
   threeSessionStreak,
   type SessionLog,
   type ExerciseLog,
@@ -398,5 +399,13 @@ describe('session steps', () => {
       [7, 1],
       [8, 1],
     ])
+  })
+})
+
+describe('quick logs per week', () => {
+  it('counts squash dates by block week', () => {
+    const m = countPerWeek(['2026-11-24', '2026-11-27', '2026-12-01'], START)
+    expect(m.get(8)).toBe(2)
+    expect(m.get(9)).toBe(1)
   })
 })

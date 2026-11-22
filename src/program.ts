@@ -79,6 +79,8 @@ export interface Phase {
 
 export const DEFAULT_BLOCK_START = '2026-10-05'
 export const DELOAD_EVERY = 5
+/** Hard squash matches in one week that call for an extra deload week. */
+export const HARD_MATCHES_FOR_DELOAD = 2
 
 export const exercises: Record<string, Exercise> = {
   squat: {
