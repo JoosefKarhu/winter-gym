@@ -1,0 +1,7 @@
+dist
+dev-dist
+public/img
+package-lock.json
+test-results
+playwright-report
+.impeccable
