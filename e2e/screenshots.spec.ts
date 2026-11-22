@@ -28,11 +28,11 @@ for (const theme of ['dark', 'light'] as const) {
     // Session B: pre-check, warm-up, first lift, rest timer.
     await page.goto('/#/')
     await page.getByRole('button', { name: /Hinge, press, carry/ }).click()
-    await heading(page, /How was your back/)
-    await page.getByRole('button', { name: /Pain down a leg/ }).click()
-    await shot('precheck')
-    await page.getByRole('button', { name: /Clearly worse/ }).click()
     await heading(page, /Warm-up/)
+    await page.getByRole('switch', { name: /Back clearly worse/ }).click()
+    await page.getByRole('button', { name: /Pain down a leg/ }).click()
+    await shot('backcheck', true)
+    await page.getByRole('button', { name: /Pain down a leg/ }).click()
     await page.getByRole('checkbox').first().click()
     await page.getByRole('checkbox').nth(1).click()
     await shot('warmup')
@@ -42,8 +42,11 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: /Done set 1/ }).click()
     await page.clock.runFor(20_000)
     await shot('rest')
-    await page.goto('/#/')
+    await page.getByRole('button', { name: 'Back to today' }).click()
+    await shot('leave')
+    await page.getByRole('button', { name: 'Keep it for later' }).click()
     await heading(page, /Week 8/)
+    await page.getByRole('button', { name: /Mon 23 Nov: \d logged/ }).click()
     await shot('home-active')
 
     // Jump to the finish screen.

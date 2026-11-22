@@ -28,8 +28,10 @@ export default function Home() {
   const lastDate = (t: SessionType) =>
     done.filter((s) => s.type === t).sort((a, b) => b.date.localeCompare(a.date))[0]?.date
 
+  // Quick logs go to the day picked in the week strip, today when none is.
+  const logDay = openDay ?? today
   async function quickLog(kind: QuickLog['kind']) {
-    const id = await db.quickLogs.add({ kind, date: today, at: Date.now() })
+    const id = await db.quickLogs.add({ kind, date: logDay, at: Date.now() })
     setUndo({ id, kind })
     setTimeout(() => setUndo((u) => (u?.id === id ? null : u)), 6000)
   }
@@ -196,7 +198,10 @@ export default function Home() {
               onClick={() => quickLog(k)}
               className="flex h-14 items-center justify-center gap-2 rounded-xl bg-surface font-semibold active:bg-surface-2"
             >
-              <Icon name="plus" size={22} /> {k === 'squash' ? 'Squash match' : 'Simulator'}
+              <Icon name="plus" size={22} /> {k === 'squash' ? 'Squash' : 'Simulator'}
+              {logDay !== today && (
+                <span className="font-medium text-muted">{fmtDate(logDay, false)}</span>
+              )}
             </button>
           ),
         )}

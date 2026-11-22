@@ -85,7 +85,8 @@ the dates in `src/logic.test.ts` too.
    repeat the load. Reps prefill at the top of the range.
 6. First session in phase 4: reference x 0.85.
 7. Accessories: last load, never increased automatically.
-8. Back "clearly worse": same loads, no increases, banner shown.
+8. Back "clearly worse" (a switch on the A and B warm-up, off by default): same loads, no
+   increases, banner shown. The red-flag check sits under the same switch.
 9. Rounding: barbell lifts 2.5 kg, dumbbells, plates and cables 1 kg. Pull-up added weight steps in
    2.5 kg like the barbell lifts.
 

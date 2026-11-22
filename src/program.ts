@@ -22,6 +22,8 @@ export interface Exercise {
   /** Use only one frame of the photo (dead hang = finish frame of pull-ups). */
   photoFrame?: 0 | 1
   photoNote?: string
+  /** A single openly licensed photo from outside Free Exercise DB, credited in the guide. */
+  photoFile?: { url: string; credit: string }
   altPhoto?: { id: string; label: string }
 }
 
@@ -337,6 +339,10 @@ export const exercises: Record<string, Exercise> = {
     id: 'birddog',
     name: 'Bird dog',
     equipment: 'bodyweight',
+    photoFile: {
+      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Girl_doing_bird_dog_yoga_pose.jpg/1280px-Girl_doing_bird_dog_yoga_pose.jpg',
+      credit: 'Bird dog: PTPioneer, CC BY 2.0, via Wikimedia Commons',
+    },
     cues: {
       setup: 'Hands and knees, back flat like a table.',
       move: 'Reach one arm forward and the opposite leg straight back until both are level with the body. Hold 5 seconds, then switch sides.',

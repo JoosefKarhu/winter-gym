@@ -8,7 +8,6 @@ test('full Session A, then the next Session A prefills progressed loads', async 
   await expect(page.getByRole('heading', { name: /Week 7/ })).toBeVisible()
 
   await page.getByRole('button', { name: /Squat, pull, rotate/ }).click()
-  await page.getByRole('button', { name: /Same or better/ }).click()
 
   // Warm-up checklist.
   const boxes = page.getByRole('checkbox')
@@ -70,7 +69,6 @@ test('full Session A, then the next Session A prefills progressed loads', async 
   await page.clock.setSystemTime(new Date('2026-11-23T17:30:00'))
   await page.goto('/#/')
   await page.getByRole('button', { name: /Squat, pull, rotate/ }).click()
-  await page.getByRole('button', { name: /Same or better/ }).click()
   await page.getByRole('button', { name: /Start lifting/ }).click()
   await expect(page.getByRole('spinbutton', { name: 'kg', exact: true })).toHaveValue('102.5')
   await expect(page.getByText(/Add weight today/)).toBeVisible()
@@ -82,11 +80,14 @@ test('full Session A, then the next Session A prefills progressed loads', async 
   await expect(page.getByText('Go heavier only when every rep is clean')).toBeVisible()
 })
 
-test('clearly worse back blocks the increase', async ({ page }) => {
+test('back clearly worse switch blocks the increase', async ({ page }) => {
   await setup(page, { time: '2026-11-26T17:30:00' })
   await page.goto('/#/')
   await page.getByRole('button', { name: /Squat, pull, rotate/ }).click()
-  await page.getByRole('button', { name: /Clearly worse/ }).click()
+  const sw = page.getByRole('switch', { name: /Back clearly worse today/ })
+  await expect(sw).toHaveAttribute('aria-checked', 'false')
+  await sw.click()
+  await expect(sw).toHaveAttribute('aria-checked', 'true')
   await page.getByRole('button', { name: /Start lifting/ }).click()
   await expect(page.getByRole('status')).toHaveText('Repeat last loads today, no adding')
   // Fixture week 8 squat was 90 kg x 8 on all sets: would be +2.5, blocked here.
@@ -101,6 +102,7 @@ test('red flag hides Sessions A and B until cleared', async ({ page }) => {
   await page.getByRole('button', { name: 'I have one of these' }).click()
   await expect(page.getByRole('button', { name: /Squat, pull, rotate/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: /Mobility and maintenance/ })).toBeEnabled()
+  await expect(page.getByText('Continue session')).toHaveCount(0)
   await page.goto('/#/settings')
   await page.getByRole('button', { name: 'Clear red flag' }).click()
   await page.goto('/#/')

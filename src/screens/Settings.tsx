@@ -103,7 +103,7 @@ export default function SettingsScreen() {
     setMsg({ text, bad })
     setTimeout(() => setMsg(null), 4000)
   }
-  const noPhoto = Object.values(exercises).filter((e) => !e.photo)
+  const noPhoto = Object.values(exercises).filter((e) => !e.photo && !e.photoFile)
 
   async function copy(make: () => Promise<string>, what: string) {
     try {

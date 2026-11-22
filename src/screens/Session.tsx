@@ -1,3 +1,4 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { db, saveSettings, useActiveSession, useSessions, useSettings, type Settings } from '../db'
 import {
@@ -34,12 +35,30 @@ import { ExercisePhoto } from './Guide'
 
 // ---------- create ----------
 
-let creating = false
-async function createSession(
+/** Prefilled set rows for every exercise in a session. */
+function buildExercises(
   type: SessionType,
-  backCheck: SessionLog['backCheck'],
-  settings: Settings,
-) {
+  date: string,
+  deload: boolean,
+  backWorse: boolean,
+  history: SessionLog[],
+): ExerciseLog[] {
+  return sessions[type].items.map((item, i) => {
+    const rx = prescribe({ type, itemIndex: i, date, deload, backWorse, history })
+    return {
+      exerciseId: item.exerciseId,
+      target: { sets: rx.sets, min: rx.min, max: rx.max },
+      sets: Array.from({ length: rx.sets }, () => ({
+        kg: rx.loaded ? rx.kg : undefined,
+        value: rx.value,
+        done: false,
+      })),
+    }
+  })
+}
+
+let creating = false
+async function createSession(type: SessionType, settings: Settings) {
   if (creating) return
   creating = true
   try {
@@ -48,25 +67,6 @@ async function createSession(
     const date = todayIso()
     const ctx = dayContext(date, settings.blockStart, settings.extraDeloadWeeks)
     const deload = type !== 'C' && ctx.deload
-    const exercisesLog: ExerciseLog[] = sessions[type].items.map((item, i) => {
-      const rx = prescribe({
-        type,
-        itemIndex: i,
-        date,
-        deload,
-        backWorse: backCheck === 'worse',
-        history,
-      })
-      return {
-        exerciseId: item.exerciseId,
-        target: { sets: rx.sets, min: rx.min, max: rx.max },
-        sets: Array.from({ length: rx.sets }, () => ({
-          kg: rx.loaded ? rx.kg : undefined,
-          value: rx.value,
-          done: false,
-        })),
-      }
-    })
     await db.sessions.add({
       type,
       date,
@@ -75,10 +75,11 @@ async function createSession(
       week: ctx.week,
       phase: ctx.phase.n,
       deload,
-      backCheck,
+      // A and B assume "same or better" until the warm-up switch says otherwise.
+      backCheck: type === 'C' ? null : 'same',
       warmupDone: warmup.map(() => false),
       index: 0,
-      exercises: exercisesLog,
+      exercises: buildExercises(type, date, deload, false, history),
       notes: {},
     })
   } finally {
@@ -90,14 +91,19 @@ async function createSession(
 
 export default function Session({ type }: { type: SessionType }) {
   const settings = useSettings()
+  // null once loaded with no row, undefined while loading: never start A or B before the red flag is known.
+  const stored = useLiveQuery(async () => (await db.settings.get(1)) ?? null)
   const active = useActiveSession()
   const history = useSessions()
+  const blocked = settings.redFlag && type !== 'C'
 
   useEffect(() => {
-    if (active === null && type === 'C') void createSession('C', null, settings)
-  }, [active, type, settings])
+    // The hash check stops a cancelled session restarting while the app navigates away.
+    if (active !== null || stored === undefined || blocked) return
+    if (location.hash === '#/session/' + type) void createSession(type, settings)
+  }, [active, stored, blocked, type, settings])
 
-  if (active === undefined || history === undefined) return null
+  if (active === undefined || history === undefined || stored === undefined) return null
 
   if (active && active.type !== type) {
     return (
@@ -125,8 +131,7 @@ export default function Session({ type }: { type: SessionType }) {
   }
 
   if (!active) {
-    if (type === 'C') return null
-    if (settings.redFlag) {
+    if (blocked) {
       return (
         <Shell type={type} title={sessions[type].title} onClose={() => go('')}>
           <div className="px-4 pt-6">
@@ -142,7 +147,7 @@ export default function Session({ type }: { type: SessionType }) {
         </Shell>
       )
     }
-    return <PreCheck type={type} onAnswer={(b) => createSession(type, b, settings)} />
+    return null
   }
 
   return (
@@ -217,74 +222,6 @@ function Shell({
   )
 }
 
-// ---------- pre-check ----------
-
-function PreCheck({
-  type,
-  onAnswer,
-}: {
-  type: SessionType
-  onAnswer: (b: 'same' | 'worse') => void
-}) {
-  const [flags, setFlags] = useState(false)
-  return (
-    <Shell type={type} title={sessions[type].title} onClose={() => go('')}>
-      <div className="px-4 pt-6">
-        <h1 className="display text-[38px] font-bold">
-          How was your back the morning after your last session?
-        </h1>
-        <p className="mt-3 text-muted">{backRules.normal}</p>
-        <div className="mt-8 flex flex-col gap-3">
-          <button
-            onClick={() => onAnswer('same')}
-            className={`flex h-20 items-center justify-between rounded-2xl px-5 text-left ${plate[type].bg} ${plate[type].text}`}
-          >
-            <span className="display text-[28px] font-bold">Same or better</span>
-            <Icon name="right" size={28} />
-          </button>
-          <button
-            onClick={() => onAnswer('worse')}
-            className="flex h-20 items-center justify-between rounded-2xl border-2 border-ink px-5 text-left"
-          >
-            <span>
-              <span className="display block text-[28px] font-bold">Clearly worse</span>
-              <span className="text-[15px] text-muted">Repeat last loads today, no adding</span>
-            </span>
-            <Icon name="right" size={28} />
-          </button>
-        </div>
-        <button
-          onClick={() => setFlags((f) => !f)}
-          aria-expanded={flags}
-          className="mt-6 flex min-h-12 items-center gap-2 font-semibold text-danger"
-        >
-          <Icon name="alert" size={22} /> Pain down a leg, numbness or sharp pain?
-        </button>
-        {flags && (
-          <div className="mt-2 rounded-2xl border-2 border-danger p-4">
-            <p className="display text-[22px] font-bold">Red flags</p>
-            <ul className="mt-2 list-disc pl-5">
-              {backRules.redFlags.map((f) => (
-                <li key={f}>{f}</li>
-              ))}
-            </ul>
-            <p className="mt-3">{backRules.redFlagAction}</p>
-            <button
-              onClick={async () => {
-                await saveSettings({ redFlag: true })
-                go('')
-              }}
-              className="mt-4 h-14 w-full rounded-xl bg-danger font-bold text-white"
-            >
-              I have one of these
-            </button>
-          </div>
-        )}
-      </div>
-    </Shell>
-  )
-}
-
 // ---------- flow ----------
 
 interface Rest {
@@ -342,25 +279,59 @@ function Flow({
 
   const restBar = rest && <RestBar rest={rest} type={s.type} onChange={setRest} />
   const title = sessions[s.type].title
-  const close = () => go('')
+  const [leaving, setLeaving] = useState(false)
+  const close = () => setLeaving(true)
+  const sheet = leaving && (
+    <LeaveSheet
+      type={s.type}
+      onKeep={() => go('')}
+      onCancel={async () => {
+        go('')
+        await db.sessions.delete(s.id!)
+      }}
+      onStay={() => setLeaving(false)}
+    />
+  )
+
+  function setBackWorse(worse: boolean) {
+    // Re-prefill only exercises not started yet.
+    const fresh = buildExercises(s.type, s.date, s.deload, worse, history)
+    update({
+      backCheck: worse ? 'worse' : 'same',
+      exercises: s.exercises.map((e, j) => (e.sets.some((x) => x.done) ? e : fresh[j]!)),
+    })
+  }
 
   if (s.index === 0) {
     return (
-      <Shell
-        type={s.type}
-        title={title}
-        onClose={close}
-        footer={
-          <ActionBar>
-            <PrimaryButton type={s.type} onClick={() => goTo(1)}>
-              Start {s.type === 'C' ? 'part 1' : 'lifting'}
-            </PrimaryButton>
-          </ActionBar>
-        }
-      >
-        <Banners s={s} />
-        <Warmup s={s} update={update} firstLift={exercises[items[0]!.exerciseId]!.name} />
-      </Shell>
+      <>
+        {sheet}
+        <Shell
+          type={s.type}
+          title={title}
+          onClose={close}
+          footer={
+            <ActionBar>
+              <PrimaryButton type={s.type} onClick={() => goTo(1)}>
+                Start {s.type === 'C' ? 'part 1' : 'lifting'}
+              </PrimaryButton>
+            </ActionBar>
+          }
+        >
+          <Banners s={{ ...s, backCheck: null }} />
+          <Warmup
+            s={s}
+            update={update}
+            firstLift={exercises[items[0]!.exerciseId]!.name}
+            onBackWorse={setBackWorse}
+            onRedFlag={async () => {
+              await saveSettings({ redFlag: true })
+              go('')
+              await db.sessions.delete(s.id!)
+            }}
+          />
+        </Shell>
+      </>
     )
   }
 
@@ -383,45 +354,102 @@ function Flow({
   const ref = referenceLog(history, s.type, item.exerciseId)
 
   return (
-    <Shell
-      type={s.type}
-      title={title}
-      onClose={close}
-      progress={{ at: s.index, of: steps.length }}
-      footer={null}
-    >
-      <div {...swipe}>
-        <Banners s={s} />
-        {step.round === 0 && steps.findIndex((x) => x.round === 0) === s.index - 1 && (
-          <p className="mx-4 mb-3 rounded-xl bg-surface p-3 text-[15px]">
-            <strong className="display mr-1 text-[18px]">Part 2.</strong>
-            {mobilityIntro}
-          </p>
-        )}
-        <ExerciseScreen
-          key={s.index}
-          type={s.type}
-          rx={rx}
-          step={step}
-          lastTime={ref && step.round == null ? lastTimeText(ref, rx) : undefined}
-          note={s.notes[item.exerciseId] ?? ''}
-          itemNote={item.note}
-          log={log}
-          seen={timesDone(history, item.exerciseId)}
-          videoUrl={settings.videoUrls[item.exerciseId]}
-          onSets={(sets) => {
-            const next = s.exercises.map((e, j) => (j === i ? { ...e, sets } : e))
-            update({ exercises: next })
-          }}
-          onNote={(text) => update({ notes: { ...s.notes, [item.exerciseId]: text } })}
-          startRest={(sec) => sec > 0 && setRest({ endsAt: Date.now() + sec * 1000, total: sec })}
-          onPrev={() => goTo(s.index - 1)}
-          onNext={() => goTo(s.index + 1)}
-          isLast={s.index === steps.length}
-          restBar={restBar}
-        />
+    <>
+      {sheet}
+      <Shell
+        type={s.type}
+        title={title}
+        onClose={close}
+        progress={{ at: s.index, of: steps.length }}
+        footer={null}
+      >
+        <div {...swipe}>
+          <Banners s={s} />
+          {step.round === 0 && steps.findIndex((x) => x.round === 0) === s.index - 1 && (
+            <p className="mx-4 mb-3 rounded-xl bg-surface p-3 text-[15px]">
+              <strong className="display mr-1 text-[18px]">Part 2.</strong>
+              {mobilityIntro}
+            </p>
+          )}
+          <ExerciseScreen
+            key={s.index}
+            type={s.type}
+            rx={rx}
+            step={step}
+            lastTime={ref && step.round == null ? lastTimeText(ref, rx) : undefined}
+            note={s.notes[item.exerciseId] ?? ''}
+            itemNote={item.note}
+            log={log}
+            seen={timesDone(history, item.exerciseId)}
+            videoUrl={settings.videoUrls[item.exerciseId]}
+            onSets={(sets) => {
+              const next = s.exercises.map((e, j) => (j === i ? { ...e, sets } : e))
+              update({ exercises: next })
+            }}
+            onNote={(text) => update({ notes: { ...s.notes, [item.exerciseId]: text } })}
+            startRest={(sec) => sec > 0 && setRest({ endsAt: Date.now() + sec * 1000, total: sec })}
+            onPrev={() => goTo(s.index - 1)}
+            onNext={() => goTo(s.index + 1)}
+            isLast={s.index === steps.length}
+            restBar={restBar}
+          />
+        </div>
+      </Shell>
+    </>
+  )
+}
+
+function LeaveSheet({
+  type,
+  onKeep,
+  onCancel,
+  onStay,
+}: {
+  type: SessionType
+  onKeep: () => void
+  onCancel: () => void
+  onStay: () => void
+}) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onStay()
+    addEventListener('keydown', esc)
+    return () => removeEventListener('keydown', esc)
+  }, [onStay])
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/55" onClick={onStay}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="leave-title"
+        onClick={(e) => e.stopPropagation()}
+        className="safe-bottom mx-auto w-full max-w-[520px] rounded-t-3xl bg-surface px-4 pb-4 pt-5"
+      >
+        <h2 id="leave-title" className="display text-[30px] font-bold">
+          Leave the session?
+        </h2>
+        <p className="mt-1 text-muted">
+          Keep it to carry on later from Today. A cancelled session is not saved.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            autoFocus
+            onClick={onKeep}
+            className={`h-14 rounded-2xl text-[18px] font-bold ${plate[type].bg} ${plate[type].text}`}
+          >
+            Keep it for later
+          </button>
+          <button
+            onClick={onCancel}
+            className="h-14 rounded-2xl border-2 border-danger text-[18px] font-bold text-danger"
+          >
+            Cancel session
+          </button>
+          <button onClick={onStay} className="h-12 font-semibold text-muted">
+            Stay here
+          </button>
+        </div>
       </div>
-    </Shell>
+    </div>
   )
 }
 
@@ -513,10 +541,14 @@ function Warmup({
   s,
   update,
   firstLift,
+  onBackWorse,
+  onRedFlag,
 }: {
   s: SessionLog
   update: (p: Partial<SessionLog>) => void
   firstLift: string
+  onBackWorse: (worse: boolean) => void
+  onRedFlag: () => void
 }) {
   const count = s.warmupDone.filter(Boolean).length
   return (
@@ -562,13 +594,77 @@ function Warmup({
           )
         })}
       </ul>
+      {s.type !== 'C' && <BackCheck s={s} onBackWorse={onBackWorse} onRedFlag={onRedFlag} />}
       {s.type !== 'C' && (
-        <div className={`mt-5 rounded-2xl border-2 p-4 ${plate[s.type].border}`}>
+        <div className={`mt-3 rounded-2xl border-2 p-4 ${plate[s.type].border}`}>
           <p className="display text-[22px] font-bold">Then ramp up</p>
           <p className="mt-1">
             Do 2 or 3 lighter sets of <strong>{firstLift.toLowerCase()}</strong> before set 1. They
             are not logged.
           </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BackCheck({
+  s,
+  onBackWorse,
+  onRedFlag,
+}: {
+  s: SessionLog
+  onBackWorse: (worse: boolean) => void
+  onRedFlag: () => void
+}) {
+  const [flags, setFlags] = useState(false)
+  const worse = s.backCheck === 'worse'
+  const started = s.exercises.some((e) => e.sets.some((x) => x.done))
+  return (
+    <div className="mt-5 rounded-2xl bg-surface px-3 py-2">
+      <button
+        role="switch"
+        aria-checked={worse}
+        disabled={started}
+        onClick={() => onBackWorse(!worse)}
+        className="flex min-h-16 w-full items-center gap-3 px-1 text-left disabled:opacity-60"
+      >
+        <span className="flex-1">
+          <span className="block text-[18px] font-semibold">Back clearly worse today?</span>
+          <span className="block text-[15px] text-muted">
+            {worse ? 'Repeating last loads, no adding' : 'Than the morning after your last session'}
+          </span>
+        </span>
+        <span
+          aria-hidden="true"
+          className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${worse ? 'bg-plate-c' : 'bg-surface-2'}`}
+        >
+          <span
+            className={`absolute top-1 h-6 w-6 rounded-full transition-[left] ${worse ? 'left-7 bg-[#141414]' : 'left-1 bg-muted'}`}
+          />
+        </span>
+      </button>
+      <button
+        onClick={() => setFlags((f) => !f)}
+        aria-expanded={flags}
+        className="flex min-h-12 items-center gap-2 px-1 text-[15px] font-semibold text-danger"
+      >
+        <Icon name="alert" size={20} /> Pain down a leg, numbness or sharp pain?
+      </button>
+      {flags && (
+        <div className="mb-2 rounded-xl border-2 border-danger p-3">
+          <ul className="list-disc pl-5">
+            {backRules.redFlags.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+          <p className="mt-2">{backRules.redFlagAction}</p>
+          <button
+            onClick={onRedFlag}
+            className="mt-3 h-14 w-full rounded-xl bg-danger font-bold text-white"
+          >
+            I have one of these
+          </button>
         </div>
       )}
     </div>
@@ -1053,8 +1149,8 @@ function Finish({
         <button
           onClick={async () => {
             if (confirm('Discard this session? Nothing will be saved.')) {
-              await db.sessions.delete(s.id!)
               go('')
+              await db.sessions.delete(s.id!)
             }
           }}
           className="mt-4 h-12 w-full font-semibold text-danger"

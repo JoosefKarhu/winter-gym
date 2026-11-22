@@ -18,7 +18,7 @@ export function ExercisePhoto({
   lazy?: boolean
 }) {
   const ex = exercises[id]!
-  if (!ex.photo) {
+  if (!ex.photo && !ex.photoFile) {
     return (
       <div className="flex aspect-[3/1] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line px-4 text-center">
         <p className="display text-[22px] font-bold">{ex.name}</p>
@@ -39,12 +39,12 @@ export function ExercisePhoto({
       </div>
     )
   }
-  const single = ex.photoFrame != null
+  const single = ex.photoFrame != null || !!ex.photoFile
   return (
     <figure>
       <img
         src={img(alt ? `${id}-alt` : id)}
-        alt={`${ex.name}: start and finish position`}
+        alt={single ? ex.name : `${ex.name}: start and finish position`}
         width={single ? 540 : 1080}
         height={360}
         loading={lazy ? 'lazy' : 'eager'}
@@ -182,7 +182,16 @@ export default function Guide() {
       {!filtered.length && (
         <p className="mt-8 text-center text-muted">No exercise matches "{q}".</p>
       )}
-      <p className="mt-8 pb-4 text-center text-[15px] text-muted">{photoCredit}</p>
+      <p className="mt-8 pb-4 text-center text-[15px] text-muted">
+        {photoCredit}
+        {Object.values(exercises)
+          .filter((e) => e.photoFile)
+          .map((e) => (
+            <span key={e.id} className="block">
+              {e.photoFile!.credit}
+            </span>
+          ))}
+      </p>
     </div>
   )
 }

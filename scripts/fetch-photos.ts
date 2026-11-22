@@ -1,4 +1,5 @@
-// Downloads start/finish photos from Free Exercise DB (public domain), joins them side by side
+// Downloads start/finish photos from Free Exercise DB (public domain), plus single credited photos
+// (photoFile) for moves the DB lacks, joins them side by side
 // with "1" and "2" labels and writes compressed JPEGs to public/img. Run: npm run photos
 import sharp from 'sharp'
 import { mkdir } from 'node:fs/promises'
@@ -37,6 +38,18 @@ async function pair(dbId: string, file: string) {
 
 await mkdir(OUT, { recursive: true })
 for (const ex of Object.values(exercises)) {
+  if (ex.photoFile) {
+    const res = await fetch(ex.photoFile.url, {
+      headers: { 'User-Agent': 'winter-gym-photo-script/1.0' },
+    })
+    if (!res.ok) throw new Error(`${ex.id}: HTTP ${res.status}`)
+    await sharp(Buffer.from(await res.arrayBuffer()))
+      .resize(FRAME_W, H, { fit: 'cover' })
+      .jpeg({ quality: 72, mozjpeg: true })
+      .toFile(new URL(`${ex.id}.jpg`, OUT).pathname)
+    console.log('ok', ex.id)
+    continue
+  }
   if (!ex.photo) continue
   if (ex.photoFrame != null) {
     await sharp(await frame(ex.photo, ex.photoFrame))
