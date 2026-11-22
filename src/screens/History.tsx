@@ -13,7 +13,13 @@ import {
   weekStart,
   type SessionLog,
 } from '../logic'
-import { HARD_MATCHES_FOR_DELOAD, exercises, sessions, type SessionType } from '../program'
+import {
+  BLOCK_WEEKS,
+  HARD_MATCHES_FOR_DELOAD,
+  exercises,
+  sessions,
+  type SessionType,
+} from '../program'
 import { Badge, fmtDate, plate } from '../ui'
 import { summarizeSets } from './Session'
 
@@ -22,7 +28,6 @@ const CHARTS: { id: string; title: string; type: SessionType }[] = [
   { id: 'deadlift', title: 'Deadlift', type: 'B' },
   { id: 'pullup', title: 'Pull-up, added kg', type: 'A' },
 ]
-const WEEKS = 26
 
 export default function History() {
   const all = useSessions()
@@ -65,7 +70,7 @@ export default function History() {
               {s.finishedAt ? `, ${Math.round((s.finishedAt - s.startedAt) / 60000)} min` : ''}
             </span>
           </span>
-          {s.deload && <Badge tone="warn">Deload</Badge>}
+          {s.deload && <Badge>Deload</Badge>}
         </summary>
         <ul className="divide-y divide-line border-t border-line">
           {s.exercises.map((e) => {
@@ -155,7 +160,7 @@ export default function History() {
               </span>
               <span className="flex-1">
                 <span className="block font-semibold">
-                  {f.quick.kind === 'squash' ? 'Squash match' : 'Golf simulator'}
+                  {f.quick.kind === 'squash' ? 'Squash match' : 'Simulator'}
                 </span>
                 <span className="text-[15px] text-muted">
                   {fmtDate(f.quick.date)}, week {blockWeek(f.quick.date, settings.blockStart)}
@@ -276,14 +281,14 @@ function LoadChart({
   const T = 18
   const B = 20
   const start = dayNumber(blockStart)
-  const end = dayNumber(weekStart(WEEKS + 1, blockStart))
+  const end = dayNumber(weekStart(BLOCK_WEEKS + 1, blockStart))
   const x = (iso: string) => L + ((dayNumber(iso) - start) / (end - start)) * (W - L - 4)
   const kgs = data.map((d) => d.kg)
   const lo = kgs.length ? Math.floor((Math.min(...kgs) - 5) / 5) * 5 : 0
   const hi = kgs.length ? Math.ceil((Math.max(...kgs) + 5) / 5) * 5 : 100
   const y = (kg: number) =>
     T + (1 - (kg - Math.max(0, lo)) / (hi - Math.max(0, lo) || 1)) * (H - T - B)
-  const deloads = Array.from({ length: WEEKS }, (_, i) => i + 1).filter((w) =>
+  const deloads = Array.from({ length: BLOCK_WEEKS }, (_, i) => i + 1).filter((w) =>
     isDeloadWeek(w, extra),
   )
   const last = data[data.length - 1]
@@ -389,7 +394,7 @@ function LoadChart({
           fill="var(--muted)"
           fontFamily="Barlow"
         >
-          {fmtDate(weekStart(WEEKS + 1, blockStart), false)}
+          {fmtDate(weekStart(BLOCK_WEEKS + 1, blockStart), false)}
         </text>
       </svg>
       <p className="mt-1 text-[13px] text-muted">

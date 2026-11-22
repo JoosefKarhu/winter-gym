@@ -336,7 +336,7 @@ function Flow({
   }
 
   if (s.index >= last) {
-    return <Finish s={s} history={history} onBack={() => goTo(last - 1)} update={update} />
+    return <Finish s={s} history={history} onBack={() => goTo(last - 1)} />
   }
 
   const step = steps[s.index - 1]!
@@ -474,7 +474,7 @@ function Banners({ s }: { s: SessionLog }) {
     <div className="flex flex-col gap-2 px-4 pb-3 pt-1">
       {s.deload && (
         <p className="flex items-center gap-2 text-[15px] font-semibold">
-          <Badge tone="warn">Deload</Badge> 2 sets, about 10 percent lighter
+          <Badge>Deload</Badge> 2 sets, about 10 percent lighter
         </p>
       )}
       {s.backCheck === 'worse' && (
@@ -756,7 +756,7 @@ function ExerciseScreen(props: {
         </p>
         {props.lastTime && (
           <p className="mt-2 text-[15px]">
-            <span className="font-semibold text-muted">Last time </span>
+            <span className="font-semibold text-muted">Last full session </span>
             <span className="num text-[18px] font-bold">{props.lastTime}</span>
           </p>
         )}
@@ -955,6 +955,33 @@ export function Cues({
 
 // ---------- timers ----------
 
+/** The docked timer: session colour drains left to right as time runs out. */
+function TimerBar({
+  name,
+  type,
+  pct,
+  children,
+}: {
+  name: string
+  type: SessionType
+  pct: number
+  children: ReactNode
+}) {
+  return (
+    <div
+      role="timer"
+      aria-label={name}
+      className="relative overflow-hidden border-t border-line bg-surface"
+    >
+      <div
+        className={`absolute inset-y-0 left-0 ${plate[type].bg} opacity-25 transition-[width] duration-200 ease-linear`}
+        style={{ width: `${Math.max(0, Math.min(1, pct)) * 100}%` }}
+      />
+      {children}
+    </div>
+  )
+}
+
 function RestBar({
   rest,
   type,
@@ -975,17 +1002,8 @@ function RestBar({
     const t = setTimeout(() => change.current(null), 2500)
     return () => clearTimeout(t)
   }, [over])
-  const pct = Math.max(0, Math.min(1, left / rest.total))
   return (
-    <div
-      role="timer"
-      aria-label="Rest timer"
-      className="relative overflow-hidden border-t border-line bg-surface"
-    >
-      <div
-        className={`absolute inset-y-0 left-0 ${plate[type].bg} opacity-25 transition-[width] duration-200 ease-linear`}
-        style={{ width: `${pct * 100}%` }}
-      />
+    <TimerBar name="Rest timer" type={type} pct={left / rest.total}>
       <div className="relative flex items-center gap-2 px-3 py-2">
         <div className="flex-1">
           <span className="block text-[13px] font-semibold uppercase tracking-wider text-muted">
@@ -1012,7 +1030,7 @@ function RestBar({
           Skip
         </button>
       </div>
-    </div>
+    </TimerBar>
   )
 }
 
@@ -1045,15 +1063,7 @@ function HoldCountdown({
     } else onDone()
   }, [left, perSide, hold.side, onSide2, onDone])
   return (
-    <div
-      role="timer"
-      aria-label="Hold timer"
-      className="relative overflow-hidden border-t border-line bg-surface"
-    >
-      <div
-        className={`absolute inset-y-0 left-0 ${plate[type].bg} opacity-25`}
-        style={{ width: `${switching ? 0 : Math.max(0, Math.min(1, left / seconds)) * 100}%` }}
-      />
+    <TimerBar name="Hold timer" type={type} pct={switching ? 0 : left / seconds}>
       <div className="relative flex items-end justify-between px-4 py-2">
         <span className="pb-1.5 text-[15px] font-semibold uppercase tracking-wider text-muted">
           {switching ? 'Switch sides' : perSide ? `Side ${hold.side}` : 'Hold'}
@@ -1062,7 +1072,7 @@ function HoldCountdown({
           {switching ? fmtClock(left - seconds) : fmtClock(left)}
         </span>
       </div>
-    </div>
+    </TimerBar>
   )
 }
 
@@ -1076,7 +1086,6 @@ function Finish({
   s: SessionLog
   history: SessionLog[]
   onBack: () => void
-  update: (p: Partial<SessionLog>) => void
 }) {
   const now = useNow(1000)
   const minutes = Math.round((now - s.startedAt) / 60000)

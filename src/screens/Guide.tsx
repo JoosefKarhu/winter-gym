@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSettings } from '../db'
 import { backRules, exercises, photoCredit, sessions, warmup, type SessionType } from '../program'
-import { Icon, plate } from '../ui'
+import { Icon, plate, webUrl } from '../ui'
 import { Cues } from './Session'
 
 const img = (name: string) => `${import.meta.env.BASE_URL}img/${name}.jpg`
@@ -18,6 +18,7 @@ export function ExercisePhoto({
   lazy?: boolean
 }) {
   const ex = exercises[id]!
+  videoUrl = webUrl(videoUrl)
   if (!ex.photo && !ex.photoFile) {
     return (
       <div className="flex aspect-[3/1] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line px-4 text-center">
@@ -71,9 +72,9 @@ function ExerciseCard({ id, dose, note }: { id: string; dose: string; note?: str
           <ExercisePhoto id={id} alt lazy />
         </div>
       )}
-      {ex.photo && videoUrls[id] && (
+      {ex.photo && webUrl(videoUrls[id]) && (
         <a
-          href={videoUrls[id]}
+          href={webUrl(videoUrls[id])}
           target="_blank"
           rel="noreferrer"
           className="mt-2 flex min-h-12 items-center gap-2 px-1 font-semibold underline underline-offset-4"

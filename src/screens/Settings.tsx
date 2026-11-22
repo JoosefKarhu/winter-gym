@@ -1,22 +1,18 @@
 import { useState } from 'react'
-import { db, saveSettings, useSettings, DEFAULT_SETTINGS, type Settings } from '../db'
-import { DELOAD_EVERY, exercises, sessions } from '../program'
-import { Icon } from '../ui'
+import {
+  backup,
+  daysSinceBackup,
+  db,
+  download,
+  exportJson,
+  saveSettings,
+  useSettings,
+  DEFAULT_SETTINGS,
+  type Settings,
+} from '../db'
+import { BLOCK_WEEKS, DELOAD_EVERY, exercises, sessions } from '../program'
+import { Icon, webUrl } from '../ui'
 import type { SessionLog } from '../logic'
-
-const WEEKS = 26
-
-async function exportJson() {
-  const data = {
-    app: 'winter-gym',
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    settings: (await db.settings.get(1)) ?? DEFAULT_SETTINGS,
-    sessions: await db.sessions.toArray(),
-    quickLogs: await db.quickLogs.toArray(),
-  }
-  return JSON.stringify(data, null, 2)
-}
 
 async function exportCsv() {
   const rows = [
@@ -64,13 +60,6 @@ async function exportCsv() {
     .join('\n')
 }
 
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }))
-  const a = Object.assign(document.createElement('a'), { href: url, download: name })
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
 /** Validates an export file before it replaces everything on this phone. */
 function parseImport(text: string) {
   const d = JSON.parse(text) as {
@@ -96,6 +85,16 @@ function parseImport(text: string) {
   }
 }
 
+export function backupText(days: number | null) {
+  return days == null
+    ? 'never'
+    : days === 0
+      ? 'today'
+      : days === 1
+        ? 'yesterday'
+        : `${days} days ago`
+}
+
 export default function SettingsScreen() {
   const s = useSettings()
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
@@ -108,6 +107,7 @@ export default function SettingsScreen() {
   async function copy(make: () => Promise<string>, what: string) {
     try {
       await navigator.clipboard.writeText(await make())
+      if (make === exportJson) await saveSettings({ lastBackupAt: Date.now() })
       flash(`${what} copied`)
     } catch {
       flash('Copy failed. Use download instead.', true)
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
             always a deload.
           </p>
           <div className="mt-2 grid grid-cols-5 gap-1.5">
-            {Array.from({ length: WEEKS }, (_, i) => i + 1).map((w) => {
+            {Array.from({ length: BLOCK_WEEKS }, (_, i) => i + 1).map((w) => {
               const fixed = w % DELOAD_EVERY === 0
               const on = fixed || s.extraDeloadWeeks.includes(w)
               return (
@@ -234,9 +234,12 @@ export default function SettingsScreen() {
                 inputMode="url"
                 placeholder="https://"
                 defaultValue={s.videoUrls[e.id] ?? ''}
-                onBlur={(ev) =>
-                  saveSettings({ videoUrls: { ...s.videoUrls, [e.id]: ev.target.value.trim() } })
-                }
+                onBlur={(ev) => {
+                  const url = ev.target.value.trim()
+                  if (url && !webUrl(url))
+                    return flash('Use a link that starts with https://', true)
+                  void saveSettings({ videoUrls: { ...s.videoUrls, [e.id]: url } })
+                }}
                 className="mt-1 h-14 w-full rounded-xl bg-surface-2 px-4 outline-none placeholder:text-muted/70 focus:ring-2 focus:ring-ink"
               />
             </label>
@@ -246,18 +249,16 @@ export default function SettingsScreen() {
 
       <Section title="Your data">
         <p className="text-[15px] text-muted">
-          Everything lives on this phone. Export it to move phones or keep a backup.
+          Everything lives on this phone. Back it up now and then, and to move phones. Last backup:{' '}
+          <strong className="text-ink">{backupText(daysSinceBackup(s))}</strong>.
+        </p>
+        <p className="mt-2 text-[15px] text-muted">
+          On iPhone, the Home Screen app and Safari keep separate data. Log in the Home Screen app.
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <DataButton
             icon="download"
-            onClick={async () =>
-              download(
-                `winter-gym-${new Date().toISOString().slice(0, 10)}.json`,
-                await exportJson(),
-                'application/json',
-              )
-            }
+            onClick={async () => (await backup()) && flash('Backup saved')}
           >
             JSON file
           </DataButton>

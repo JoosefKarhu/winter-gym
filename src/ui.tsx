@@ -43,8 +43,6 @@ const paths = {
   chevronDown: 'M6 9l6 6 6-6',
   alert: 'M12 3l10 18H2zM12 10v5M12 18v.5',
   up: 'M12 19V5M6 11l6-6 6 6',
-  racquet: 'M14 3a6 6 0 016 6c0 3.3-2.7 6-6 6s-5-2-5-5 2-7 5-7zM9.5 13.5L4 19l1 1 5.5-5.5',
-  flag: 'M6 21V4M6 4h11l-2 4 2 4H6',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   copy: 'M9 9h10v11H9zM5 15V4h10',
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
@@ -135,23 +133,9 @@ export function Stepper({
 
 // ---------- misc ----------
 
-export function Badge({
-  children,
-  tone = 'ink',
-}: {
-  children: ReactNode
-  tone?: 'ink' | 'warn' | 'danger' | 'go'
-}) {
-  const cls = {
-    ink: 'bg-ink text-bg',
-    warn: 'bg-plate-c text-on-plate-c',
-    danger: 'bg-danger text-white',
-    go: 'bg-go text-[#0b2316]',
-  }[tone]
+export function Badge({ children }: { children: ReactNode }) {
   return (
-    <span
-      className={`display inline-flex items-center rounded-md px-2 py-1 text-[15px] font-bold tracking-wider ${cls}`}
-    >
+    <span className="display inline-flex items-center rounded-md bg-plate-c px-2 py-1 text-[15px] font-bold tracking-wider text-on-plate-c">
       {children}
     </span>
   )
@@ -229,4 +213,9 @@ export function useWakeLock(active: boolean) {
       void lock?.release()
     }
   }, [active])
+}
+
+/** Only http(s) links reach an href: a pasted or imported javascript: link stays inert. */
+export function webUrl(url?: string) {
+  return url && /^https?:\/\//i.test(url) ? url : undefined
 }

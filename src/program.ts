@@ -79,6 +79,8 @@ export interface Phase {
 
 export const DEFAULT_BLOCK_START = '2026-10-05'
 export const DELOAD_EVERY = 5
+/** Length of the block in weeks. After this Today shows the block as complete. */
+export const BLOCK_WEEKS = 26
 /** Hard squash matches in one week that call for an extra deload week. */
 export const HARD_MATCHES_FOR_DELOAD = 2
 

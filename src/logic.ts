@@ -58,7 +58,8 @@ export function isoFromDay(n: number): string {
   return new Date(n * 86_400_000).toISOString().slice(0, 10)
 }
 
-export function todayIso(now = new Date()): string {
+export function todayIso(): string {
+  const now = new Date()
   const m = String(now.getMonth() + 1).padStart(2, '0')
   const d = String(now.getDate()).padStart(2, '0')
   return `${now.getFullYear()}-${m}-${d}`
@@ -104,7 +105,7 @@ export function weekStart(week: number, blockStart: string): string {
 
 // ---------- Rule 9: rounding ----------
 
-export function loadStep(equipment: Equipment): number {
+function loadStep(equipment: Equipment): number {
   return equipment === 'barbell' ? 2.5 : 1
 }
 
@@ -153,7 +154,7 @@ function bestValue(e: ExerciseLog): number | undefined {
 
 // ---------- Rules 3, 5, 6, 7, 8: prescription ----------
 
-export interface PrescribeInput {
+interface PrescribeInput {
   type: SessionType
   itemIndex: number
   date: string

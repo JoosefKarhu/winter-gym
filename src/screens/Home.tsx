@@ -1,8 +1,33 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, saveSettings, useActiveSession, useSessions, useSettings, type QuickLog } from '../db'
-import { sessionSteps, dayContext, dayNumber, isoFromDay, mondayOf, todayIso } from '../logic'
-import { HARD_MATCHES_FOR_DELOAD, exercises, sessions, type SessionType } from '../program'
+import {
+  backup,
+  daysSinceBackup,
+  db,
+  saveSettings,
+  useActiveSession,
+  useSessions,
+  useSettings,
+  type QuickLog,
+} from '../db'
+import { backupText } from './Settings'
+import {
+  loadSeries,
+  sessionSteps,
+  dayContext,
+  dayNumber,
+  isoFromDay,
+  mondayOf,
+  todayIso,
+  type SessionLog,
+} from '../logic'
+import {
+  BLOCK_WEEKS,
+  HARD_MATCHES_FOR_DELOAD,
+  exercises,
+  sessions,
+  type SessionType,
+} from '../program'
 import { Badge, Icon, fmtDate, plate } from '../ui'
 import { go } from '../App'
 
@@ -25,6 +50,7 @@ export default function Home() {
   const [undo, setUndo] = useState<{ id: number; kind: QuickLog['kind'] } | null>(null)
 
   const done = (all ?? []).filter((s) => s.status === 'done')
+  const backupDays = daysSinceBackup(settings)
   const lastDate = (t: SessionType) =>
     done.filter((s) => s.type === t).sort((a, b) => b.date.localeCompare(a.date))[0]?.date
 
@@ -58,7 +84,7 @@ export default function Home() {
           <h1 className="display text-[64px] font-extrabold">Week {ctx.week}</h1>
           {ctx.deload && (
             <div className="mb-2">
-              <Badge tone="warn">Deload</Badge>
+              <Badge>Deload</Badge>
             </div>
           )}
         </div>
@@ -71,6 +97,8 @@ export default function Home() {
           </p>
         )}
       </header>
+
+      {ctx.week > BLOCK_WEEKS && <BlockComplete done={done} />}
 
       {!ctx.deload &&
         (quick ?? []).filter((q) => q.kind === 'squash').length >= HARD_MATCHES_FOR_DELOAD && (
@@ -128,11 +156,17 @@ export default function Home() {
                 <button
                   onClick={() => setOpenDay(open ? null : d)}
                   aria-expanded={open}
-                  aria-label={`${fmtDate(d)}: ${daySessions.length + dayQuick.length} logged`}
                   className={`flex min-h-[104px] w-full flex-col items-center gap-1 rounded-xl pb-2 pt-1.5 ${isToday ? 'bg-surface-2' : 'bg-surface'} ${open ? 'ring-2 ring-ink' : isToday ? 'ring-1 ring-muted' : ''}`}
                 >
-                  <span className="text-xs font-semibold text-muted">{DAY_LETTERS[i]}</span>
-                  <span className="num text-xl font-bold leading-none">{Number(d.slice(8))}</span>
+                  <span className="sr-only">
+                    {fmtDate(d)}, {daySessions.length + dayQuick.length} logged.
+                  </span>
+                  <span aria-hidden="true" className="text-xs font-semibold text-muted">
+                    {DAY_LETTERS[i]}
+                  </span>
+                  <span aria-hidden="true" className="num text-xl font-bold leading-none">
+                    {Number(d.slice(8))}
+                  </span>
                   <span className="mt-1 flex flex-col items-center gap-1">
                     {daySessions.map((s) => (
                       <span
@@ -230,6 +264,21 @@ export default function Home() {
         )}
       </div>
 
+      {done.length > 0 && (backupDays == null || backupDays >= 14) && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-surface p-3 pl-4">
+          <p className="flex-1 text-[15px]">
+            <strong className="block text-[17px]">Back up your log</strong>
+            <span className="text-muted">Last backup: {backupText(backupDays)}</span>
+          </p>
+          <button
+            onClick={() => backup()}
+            className="h-12 shrink-0 rounded-xl bg-ink px-4 font-semibold text-bg"
+          >
+            Save a backup
+          </button>
+        </div>
+      )}
+
       {settings.redFlag && (
         <div role="alert" className="mb-3 rounded-2xl border-2 border-danger p-4">
           <p className="display text-[22px] font-bold text-danger">Red flag logged</p>
@@ -275,5 +324,45 @@ export default function Home() {
         Bad back day? Do Session C
       </button>
     </div>
+  )
+}
+
+const BLOCK_LIFTS = [
+  ['squat', 'Back squat'],
+  ['deadlift', 'Deadlift'],
+  ['pullup', 'Pull-up, added kg'],
+] as const
+
+function BlockComplete({ done }: { done: SessionLog[] }) {
+  return (
+    <section className="mb-5 rounded-2xl border-2 border-ink p-4">
+      <h2 className="display text-[30px] font-bold">Block complete</h2>
+      <p className="mt-1 text-[15px] text-muted">{done.length} gym sessions logged.</p>
+      <dl className="mt-3 flex flex-col gap-1">
+        {BLOCK_LIFTS.map(([id, name]) => {
+          const series = loadSeries(done, id)
+          if (!series.length) return null
+          const best = Math.max(...series.map((x) => x.kg))
+          return (
+            <div key={id} className="flex items-baseline justify-between gap-3">
+              <dt>{name}</dt>
+              <dd className="num text-[20px] font-bold">
+                {series[0]!.kg} to {best} kg
+              </dd>
+            </div>
+          )
+        })}
+      </dl>
+      <p className="mt-3 text-[15px]">
+        For the next block, update the program in <code>src/program.ts</code> and set its start date
+        in Settings.
+      </p>
+      <a
+        href="#/settings"
+        className="mt-3 flex h-14 items-center justify-center rounded-xl bg-ink font-semibold text-bg"
+      >
+        Set the next start date
+      </a>
+    </section>
   )
 }

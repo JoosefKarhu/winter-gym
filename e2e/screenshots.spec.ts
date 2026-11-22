@@ -46,7 +46,7 @@ for (const theme of ['dark', 'light'] as const) {
     await shot('leave')
     await page.getByRole('button', { name: 'Keep it for later' }).click()
     await heading(page, /Week 8/)
-    await page.getByRole('button', { name: /Mon 23 Nov: \d logged/ }).click()
+    await page.getByRole('button', { name: /Mon 23 Nov, \d logged/ }).click()
     await shot('home-active')
 
     // Jump to the finish screen.
