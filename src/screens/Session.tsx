@@ -4,6 +4,8 @@ import {
   dayContext,
   detectPRs,
   prescribe,
+  referenceLog,
+  sessionSteps,
   HINT,
   timesDone,
   todayIso,
@@ -11,9 +13,22 @@ import {
   type Prescription,
   type SessionLog,
   type SetLog,
+  type Reference,
+  type Step,
 } from '../logic'
 import { backRules, exercises, mobilityIntro, sessions, warmup, type SessionType } from '../program'
-import { Badge, Icon, Stepper, beep, fmtClock, plate, primeAudio, useNow, useWakeLock } from '../ui'
+import {
+  Badge,
+  Icon,
+  Stepper,
+  beep,
+  fmtClock,
+  fmtDate,
+  plate,
+  primeAudio,
+  useNow,
+  useWakeLock,
+} from '../ui'
 import { go } from '../App'
 import { ExercisePhoto } from './Guide'
 
@@ -287,30 +302,26 @@ function Flow({
   settings: Settings
 }) {
   const [s, setS] = useState(initial)
-  const [rest, setRest] = useState<Rest | null>(null)
+  const [rest, setRestState] = useState<Rest | null>(() =>
+    initial.rest && initial.rest.endsAt > Date.now() ? initial.rest : null,
+  )
   const items = sessions[s.type].items
-  const last = items.length + 1
+  const steps = sessionSteps(s.type)
+  const last = steps.length + 1
   useWakeLock(true)
 
   function update(patch: Partial<SessionLog>) {
     setS((cur) => ({ ...cur, ...patch }))
     void db.sessions.update(s.id!, patch)
   }
+  const setRest = (r: Rest | null) => {
+    setRestState(r)
+    update({ rest: r ?? undefined })
+  }
   const goTo = (index: number) => {
     update({ index: Math.max(0, Math.min(last, index)) })
     window.scrollTo(0, 0)
   }
-
-  const rxs = items.map((_, i) =>
-    prescribe({
-      type: s.type,
-      itemIndex: i,
-      date: s.date,
-      deload: s.deload,
-      backWorse: s.backCheck === 'worse',
-      history,
-    }),
-  )
 
   const touch = useRef<{ x: number; y: number } | null>(null)
   const swipe = {
@@ -353,38 +364,48 @@ function Flow({
     )
   }
 
-  if (s.index === last) {
+  if (s.index >= last) {
     return <Finish s={s} history={history} onBack={() => goTo(last - 1)} update={update} />
   }
 
-  const i = s.index - 1
+  const step = steps[s.index - 1]!
+  const i = step.item
   const item = items[i]!
-  const rx = rxs[i]!
+  const rx = prescribe({
+    type: s.type,
+    itemIndex: i,
+    date: s.date,
+    deload: s.deload,
+    backWorse: s.backCheck === 'worse',
+    history,
+  })
   const log = s.exercises[i]!
+  const ref = referenceLog(history, s.type, item.exerciseId)
 
   return (
     <Shell
       type={s.type}
       title={title}
       onClose={close}
-      progress={{ at: s.index, of: items.length }}
+      progress={{ at: s.index, of: steps.length }}
       footer={null}
     >
       <div {...swipe}>
         <Banners s={s} />
-        {s.type === 'C' && i === items.findIndex((x) => x.kind === 'mobility') && (
+        {step.round === 0 && steps.findIndex((x) => x.round === 0) === s.index - 1 && (
           <p className="mx-4 mb-3 rounded-xl bg-surface p-3 text-[15px]">
             <strong className="display mr-1 text-[18px]">Part 2.</strong>
             {mobilityIntro}
           </p>
         )}
         <ExerciseScreen
-          key={i}
+          key={s.index}
           type={s.type}
           rx={rx}
+          step={step}
+          lastTime={ref && step.round == null ? lastTimeText(ref, rx) : undefined}
           note={s.notes[item.exerciseId] ?? ''}
           itemNote={item.note}
-          dose={item.dose}
           log={log}
           seen={timesDone(history, item.exerciseId)}
           videoUrl={settings.videoUrls[item.exerciseId]}
@@ -396,12 +417,27 @@ function Flow({
           startRest={(sec) => sec > 0 && setRest({ endsAt: Date.now() + sec * 1000, total: sec })}
           onPrev={() => goTo(s.index - 1)}
           onNext={() => goTo(s.index + 1)}
-          isLast={s.index === items.length}
+          isLast={s.index === steps.length}
           restBar={restBar}
         />
       </div>
     </Shell>
   )
+}
+
+function lastTimeText(ref: Reference, rx: Prescription) {
+  const unit = rx.measure === 'secs' ? ' s' : rx.measure === 'metres' ? ' m' : ''
+  const kgs = ref.sets.map((x) => x.kg)
+  const sameKg = kgs.every((k) => k === kgs[0])
+  const body =
+    rx.loaded && kgs[0] != null && sameKg
+      ? `${kgs[0]} kg x ${ref.sets.map((x) => x.value ?? '-').join(', ')}`
+      : ref.sets
+          .map((x) =>
+            rx.loaded && x.kg != null ? `${x.kg}x${x.value ?? '-'}` : `${x.value ?? '-'}`,
+          )
+          .join(', ')
+  return `${body}${unit} on ${fmtDate(ref.date)}`
 }
 
 function Banners({ s }: { s: SessionLog }) {
@@ -444,7 +480,7 @@ function PrimaryButton({
         onClick()
       }}
       disabled={disabled}
-      className={`display flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl text-[26px] font-bold transition-transform active:scale-[0.98] disabled:opacity-40 ${plate[type].bg} ${plate[type].text}`}
+      className={`display flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl text-[26px] font-bold disabled:opacity-40 ${plate[type].bg} ${plate[type].text}`}
     >
       {children}
     </button>
@@ -464,7 +500,7 @@ function IconButton({
     <button
       onClick={onClick}
       aria-label={label}
-      className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-surface-2 active:scale-95 transition-transform"
+      className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-surface-2"
     >
       <Icon name={icon} size={30} />
     </button>
@@ -548,20 +584,24 @@ const measureLabel = {
 } as const
 const valueStep = { reps: 1, secs: 5, metres: 5 } as const
 
-function targetText(rx: Prescription) {
-  if (rx.maxMinus != null) return `${rx.sets} x max minus ${rx.maxMinus}`
+function targetText(rx: Prescription, step: Step) {
   const unit = rx.measure === 'secs' ? ' s' : rx.measure === 'metres' ? ' m' : ''
   const range = rx.min === rx.max ? `${rx.max}` : `${rx.min} to ${rx.max}`
+  if (step.round != null) {
+    return `Round ${step.round + 1} of ${step.rounds}: ${range}${unit}${rx.perSide ? ' per side' : ''}`
+  }
+  if (rx.maxMinus != null) return `${rx.sets} x max minus ${rx.maxMinus}`
   return `${rx.sets} x ${range}${unit}${rx.perSide ? ' per side' : ''}`
 }
 
 function ExerciseScreen(props: {
   type: SessionType
   rx: Prescription
+  step: Step
+  lastTime?: string
   log: ExerciseLog
   note: string
   itemNote: string
-  dose: string
   seen: number
   videoUrl?: string
   onSets: (sets: SetLog[]) => void
@@ -572,10 +612,12 @@ function ExerciseScreen(props: {
   isLast: boolean
   restBar: ReactNode
 }) {
-  const { type, rx, log, onSets } = props
+  const { type, rx, log, onSets, step } = props
   const ex = exercises[rx.exerciseId]!
-  const firstOpen = log.sets.findIndex((x) => !x.done)
-  const [sel, setSel] = useState(firstOpen === -1 ? -1 : firstOpen)
+  // A mobility round shows only its own set.
+  const visible = step.round != null ? [step.round] : log.sets.map((_, j) => j)
+  const firstOpen = visible.find((j) => !log.sets[j]?.done) ?? -1
+  const [sel, setSel] = useState(firstOpen)
   const [hold, setHold] = useState<{ endsAt: number; side: 1 | 2 } | null>(null)
   const allDone = firstOpen === -1
   const cur = sel >= 0 ? log.sets[sel] : undefined
@@ -596,8 +638,7 @@ function ExerciseScreen(props: {
           : x,
     )
     onSets(sets)
-    const next = sets.findIndex((x) => !x.done)
-    setSel(next)
+    setSel(visible.find((j) => !sets[j]?.done) ?? -1)
     props.startRest(rx.restSec)
   }
 
@@ -611,13 +652,19 @@ function ExerciseScreen(props: {
       <div className="px-4">
         <h1 className="display text-[40px] font-extrabold">{ex.name}</h1>
         <p className="num mt-2 text-[24px] font-bold">
-          {targetText(rx)}
+          {targetText(rx, step)}
           {rx.rir && <span className="text-muted"> at {rx.rir}</span>}
         </p>
         <p className="mt-0.5 text-[15px] text-muted">
           {rx.restSec ? `Rest ${rx.restSec} s` : 'No rest timer'}. {props.itemNote}.
         </p>
-        {rx.hint && rx.hint !== HINT.backWorse && (
+        {props.lastTime && (
+          <p className="mt-2 text-[15px]">
+            <span className="font-semibold text-muted">Last time </span>
+            <span className="num text-[18px] font-bold">{props.lastTime}</span>
+          </p>
+        )}
+        {rx.hint && rx.hint !== HINT.backWorse && step.round == null && (
           <p
             className={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 font-semibold ${rx.increase ? `${plate[type].bg} ${plate[type].text}` : 'bg-surface'}`}
           >
@@ -627,30 +674,19 @@ function ExerciseScreen(props: {
         )}
       </div>
 
-      <div className="mt-4 px-4">
-        <ExercisePhoto id={rx.exerciseId} videoUrl={props.videoUrl} />
-      </div>
-
-      {ex.cues && (
-        <details open={props.seen < 3} className="group mx-4 mt-3 rounded-2xl bg-surface">
-          <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 font-semibold">
-            How to do it
-            <Icon name="chevronDown" className="transition-transform group-open:rotate-180" />
-          </summary>
-          <Cues cues={ex.cues} />
-        </details>
-      )}
-
-      <section aria-label="Sets" className="mt-5 px-4">
+      <section aria-label="Sets" className="mt-4 px-4">
         <ol className="flex flex-col gap-2">
-          {log.sets.map((x, j) => {
-            const isSel = j === sel
-            if (isSel) {
+          {visible.map((j) => {
+            const x = log.sets[j]!
+            const label = step.round != null ? `Round ${j + 1}` : `Set ${j + 1}`
+            if (j === sel) {
               return (
                 <li key={j} className={`rounded-2xl border-2 bg-surface p-3 ${plate[type].border}`}>
                   <p className="display mb-2 text-[22px] font-bold">
-                    Set {j + 1}
-                    <span className="text-muted"> of {log.sets.length}</span>
+                    {label}
+                    {step.round == null && (
+                      <span className="text-muted"> of {log.sets.length}</span>
+                    )}
                   </p>
                   <div className="flex flex-col gap-2">
                     {rx.loaded && (
@@ -685,9 +721,9 @@ function ExerciseScreen(props: {
                 <button
                   onClick={() => setSel(j)}
                   className="flex min-h-14 w-full items-center gap-3 rounded-xl bg-surface px-4 text-left"
-                  aria-label={`Edit set ${j + 1}`}
+                  aria-label={`Edit ${label.toLowerCase()}`}
                 >
-                  <span className="display w-14 text-[18px] font-bold text-muted">Set {j + 1}</span>
+                  <span className="display w-[72px] text-[18px] font-bold text-muted">{label}</span>
                   <span className="num flex-1 text-[22px] font-bold">
                     {rx.loaded && x.kg != null && `${x.kg} kg x `}
                     {x.value ?? '-'}
@@ -710,12 +746,23 @@ function ExerciseScreen(props: {
         </ol>
         {allDone && sel === -1 && (
           <p className="mt-3 flex items-center gap-2 font-semibold text-go">
-            <Icon name="check" /> All sets done
+            <Icon name="check" /> {step.round != null ? 'Round done' : 'All sets done'}
           </p>
         )}
       </section>
 
-      <label className="mx-4 mt-5 block">
+      <details open={props.seen < 3} className="group mx-4 mt-4 rounded-2xl bg-surface">
+        <summary className="flex min-h-14 cursor-pointer items-center justify-between px-4 font-semibold">
+          How to do it
+          <Icon name="chevronDown" className=" group-open:rotate-180" />
+        </summary>
+        <div className="px-3 pb-1">
+          <ExercisePhoto id={rx.exerciseId} videoUrl={props.videoUrl} />
+        </div>
+        {ex.cues && <Cues cues={ex.cues} note={ex.photoNote} />}
+      </details>
+
+      <label className="mx-4 mt-4 block">
         <span className="text-[15px] font-semibold text-muted">Note</span>
         <input
           type="text"
@@ -761,12 +808,13 @@ function ExerciseScreen(props: {
               )
             ) : (
               <PrimaryButton type={type} onClick={complete}>
-                <Icon name="check" size={30} /> Done set {sel + 1}
+                <Icon name="check" size={30} /> Done{' '}
+                {step.round != null ? 'round' : `set ${sel + 1}`}
               </PrimaryButton>
             )
           ) : sel >= 0 ? (
             <PrimaryButton type={type} onClick={() => setSel(firstOpen)}>
-              Save set {sel + 1}
+              {firstOpen >= 0 ? `Back to set ${firstOpen + 1}` : 'Done editing'}
             </PrimaryButton>
           ) : (
             <PrimaryButton type={type} onClick={props.onNext}>
@@ -780,12 +828,18 @@ function ExerciseScreen(props: {
   )
 }
 
-export function Cues({ cues }: { cues: { setup: string; move: string; avoid: string } }) {
+export function Cues({
+  cues,
+  note,
+}: {
+  cues: { setup: string; move: string; avoid: string }
+  note?: string
+}) {
   return (
     <dl className="grid gap-3 px-4 pb-4 pt-1 text-[16px]">
       {(
         [
-          ['Setup', cues.setup],
+          ['Setup', note ? `${note} ${cues.setup}` : cues.setup],
           ['Move', cues.move],
           ['Avoid', cues.avoid],
         ] as const
@@ -817,12 +871,14 @@ function RestBar({
   const now = useNow(200)
   const left = (rest.endsAt - now) / 1000
   const over = left <= 0
+  const change = useRef(onChange)
+  change.current = onChange
   useEffect(() => {
     if (!over) return
     beep()
-    const t = setTimeout(() => onChange(null), 2500)
+    const t = setTimeout(() => change.current(null), 2500)
     return () => clearTimeout(t)
-  }, [over, onChange])
+  }, [over])
   const pct = Math.max(0, Math.min(1, left / rest.total))
   return (
     <div

@@ -101,7 +101,7 @@ export function Stepper({
         type="button"
         onClick={() => bump(-step)}
         aria-label={`${label} minus ${step}`}
-        className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-surface-2 active:scale-95 transition-transform"
+        className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-surface-2"
       >
         <Icon name="minus" size={28} />
       </button>
@@ -125,7 +125,7 @@ export function Stepper({
         type="button"
         onClick={() => bump(step)}
         aria-label={`${label} plus ${step}`}
-        className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-surface-2 active:scale-95 transition-transform"
+        className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-surface-2"
       >
         <Icon name="plus" size={28} />
       </button>
@@ -144,7 +144,7 @@ export function Badge({
 }) {
   const cls = {
     ink: 'bg-ink text-bg',
-    warn: 'bg-warn text-[#141414]',
+    warn: 'bg-plate-c text-on-plate-c',
     danger: 'bg-danger text-white',
     go: 'bg-go text-[#0b2316]',
   }[tone]

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, useActiveSession, useSessions, useSettings, type QuickLog } from '../db'
-import { dayContext, dayNumber, isoFromDay, mondayOf, todayIso } from '../logic'
+import { sessionSteps, dayContext, dayNumber, isoFromDay, mondayOf, todayIso } from '../logic'
 import { exercises, sessions, type SessionType } from '../program'
 import { Badge, Icon, fmtDate, plate } from '../ui'
 import { go } from '../App'
@@ -21,6 +21,7 @@ export default function Home() {
     () => db.quickLogs.where('date').between(days[0]!, days[6]!, true, true).toArray(),
     [monday],
   )
+  const [openDay, setOpenDay] = useState<string | null>(null)
   const [undo, setUndo] = useState<{ id: number; kind: QuickLog['kind'] } | null>(null)
 
   const done = (all ?? []).filter((s) => s.status === 'done')
@@ -44,7 +45,8 @@ export default function Home() {
     go('session/' + t)
   }
 
-  const activeItem = active ? sessions[active.type].items[active.index - 1] : undefined
+  const activeStep = active ? sessionSteps(active.type)[active.index - 1] : undefined
+  const activeItem = active && activeStep ? sessions[active.type].items[activeStep.item] : undefined
 
   return (
     <div className="px-4 pt-[max(env(safe-area-inset-top),16px)]">
@@ -95,37 +97,84 @@ export default function Home() {
             const isToday = d === today
             const daySessions = done.filter((s) => s.date === d)
             const dayQuick = (quick ?? []).filter((q) => q.date === d)
+            const open = openDay === d
             return (
-              <li
-                key={d}
-                aria-label={fmtDate(d)}
-                className={`flex min-h-[104px] flex-col items-center gap-1 rounded-xl pb-2 pt-1.5 ${isToday ? 'bg-surface-2 ring-2 ring-ink' : 'bg-surface'}`}
-              >
-                <span className="text-xs font-semibold text-muted">{DAY_LETTERS[i]}</span>
-                <span className="num text-xl font-bold leading-none">{Number(d.slice(8))}</span>
-                <span className="mt-1 flex flex-col items-center gap-1">
-                  {daySessions.map((s) => (
-                    <span
-                      key={s.id}
-                      className={`num grid h-6 w-7 place-items-center rounded text-sm font-extrabold ${plate[s.type].bg} ${plate[s.type].text}`}
-                    >
-                      {s.type}
-                    </span>
-                  ))}
-                  {dayQuick.map((q) => (
-                    <span
-                      key={q.id}
-                      className="grid h-6 w-7 place-items-center rounded border border-line text-[11px] font-bold uppercase text-muted"
-                      title={q.kind === 'squash' ? 'Squash' : 'Simulator'}
-                    >
-                      {q.kind === 'squash' ? 'SQ' : 'SIM'}
-                    </span>
-                  ))}
-                </span>
+              <li key={d}>
+                <button
+                  onClick={() => setOpenDay(open ? null : d)}
+                  aria-expanded={open}
+                  aria-label={`${fmtDate(d)}: ${daySessions.length + dayQuick.length} logged`}
+                  className={`flex min-h-[104px] w-full flex-col items-center gap-1 rounded-xl pb-2 pt-1.5 ${isToday ? 'bg-surface-2' : 'bg-surface'} ${open ? 'ring-2 ring-ink' : isToday ? 'ring-1 ring-muted' : ''}`}
+                >
+                  <span className="text-xs font-semibold text-muted">{DAY_LETTERS[i]}</span>
+                  <span className="num text-xl font-bold leading-none">{Number(d.slice(8))}</span>
+                  <span className="mt-1 flex flex-col items-center gap-1">
+                    {daySessions.map((s) => (
+                      <span
+                        key={s.id}
+                        className={`num grid h-6 w-7 place-items-center rounded text-sm font-extrabold ${plate[s.type].bg} ${plate[s.type].text}`}
+                      >
+                        {s.type}
+                      </span>
+                    ))}
+                    {dayQuick.map((q) => (
+                      <span
+                        key={q.id}
+                        className="grid h-6 w-7 place-items-center rounded border border-line text-[11px] font-bold uppercase text-muted"
+                      >
+                        {q.kind === 'squash' ? 'SQ' : 'SIM'}
+                      </span>
+                    ))}
+                  </span>
+                </button>
               </li>
             )
           })}
         </ol>
+        {openDay && (
+          <div className="mt-2 rounded-2xl bg-surface p-3">
+            <p className="px-1 pb-1 font-semibold">{fmtDate(openDay)}</p>
+            <ul className="flex flex-col">
+              {done
+                .filter((s) => s.date === openDay)
+                .map((s) => (
+                  <li key={s.id}>
+                    <a href="#/history" className="flex min-h-12 items-center gap-3 px-1">
+                      <span
+                        className={`num grid h-6 w-7 place-items-center rounded text-sm font-extrabold ${plate[s.type].bg} ${plate[s.type].text}`}
+                      >
+                        {s.type}
+                      </span>
+                      <span className="flex-1">{sessions[s.type].title}</span>
+                      <span className="text-[15px] text-muted">See in history</span>
+                    </a>
+                  </li>
+                ))}
+              {(quick ?? [])
+                .filter((q) => q.date === openDay)
+                .map((q) => (
+                  <li key={q.id} className="flex min-h-12 items-center gap-3 px-1">
+                    <span className="grid h-6 w-7 place-items-center rounded border border-line text-[11px] font-bold uppercase text-muted">
+                      {q.kind === 'squash' ? 'SQ' : 'SIM'}
+                    </span>
+                    <span className="flex-1">
+                      {q.kind === 'squash' ? 'Squash match' : 'Simulator'}
+                    </span>
+                    <button
+                      onClick={() => db.quickLogs.delete(q.id!)}
+                      className="h-12 px-3 font-semibold text-danger"
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ))}
+              {!done.some((s) => s.date === openDay) &&
+                !(quick ?? []).some((q) => q.date === openDay) && (
+                  <li className="px-1 py-2 text-muted">Nothing logged this day.</li>
+                )}
+            </ul>
+          </div>
+        )}
       </section>
 
       <div className="mb-7 grid grid-cols-2 gap-2">
@@ -173,7 +222,7 @@ export default function Home() {
               <button
                 onClick={() => start(t)}
                 disabled={off}
-                className={`flex h-[104px] w-full items-center gap-4 rounded-2xl pl-5 pr-4 text-left transition-transform active:scale-[0.99] disabled:opacity-35 ${plate[t].bg} ${plate[t].text}`}
+                className={`flex h-[104px] w-full items-center gap-4 rounded-2xl pl-5 pr-4 text-left disabled:opacity-35 ${plate[t].bg} ${plate[t].text}`}
               >
                 <span className="num text-[84px] font-extrabold leading-none">{t}</span>
                 <span className="flex-1">

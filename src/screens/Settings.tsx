@@ -174,7 +174,7 @@ export default function SettingsScreen() {
             Squash tournament or more than one hard match that week. Every {DELOAD_EVERY}th week is
             always a deload.
           </p>
-          <div className="mt-2 grid grid-cols-6 gap-1.5">
+          <div className="mt-2 grid grid-cols-5 gap-1.5">
             {Array.from({ length: WEEKS }, (_, i) => i + 1).map((w) => {
               const fixed = w % DELOAD_EVERY === 0
               const on = fixed || s.extraDeloadWeeks.includes(w)
@@ -191,7 +191,7 @@ export default function SettingsScreen() {
                         : [...s.extraDeloadWeeks, w].sort((a, b) => a - b),
                     })
                   }
-                  className={`num h-12 rounded-lg text-[18px] font-bold ${on ? 'bg-warn text-[#141414]' : 'bg-surface-2'} ${fixed ? 'opacity-60' : ''}`}
+                  className={`num h-12 rounded-lg text-[18px] font-bold ${on ? 'bg-plate-c text-on-plate-c' : 'bg-surface-2'} `}
                 >
                   {w}
                 </button>
@@ -332,7 +332,7 @@ function DataButton({
   return (
     <button
       onClick={onClick}
-      className="flex h-14 items-center justify-center gap-2 rounded-xl bg-surface-2 font-semibold active:scale-[0.98]"
+      className="flex h-14 items-center justify-center gap-2 rounded-xl bg-surface-2 font-semibold"
     >
       <Icon name={icon} size={22} /> {children}
     </button>

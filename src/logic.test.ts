@@ -11,6 +11,7 @@ import {
   threeSessionStreak,
   type SessionLog,
   type ExerciseLog,
+  sessionSteps,
 } from './logic'
 
 const START = '2026-10-05'
@@ -373,5 +374,29 @@ describe('PRs and stats', () => {
     // Current week 8 has 1 so far: streak counts the completed weeks before it.
     expect(threeSessionStreak(h, START, '2026-11-24')).toBe(2)
     expect(threeSessionStreak(h, START, '2026-12-01')).toBe(0)
+  })
+})
+
+describe('session steps', () => {
+  it('A and B are one screen per exercise', () => {
+    expect(sessionSteps('A').map((x) => x.item)).toEqual([0, 1, 2, 3, 4, 5])
+  })
+  it('Session C part 2 runs as 2 rounds of the whole flow', () => {
+    const c = sessionSteps('C')
+    expect(c).toHaveLength(4 + 5 * 2)
+    expect(c.slice(4, 9).map((x) => [x.item, x.round])).toEqual([
+      [4, 0],
+      [5, 0],
+      [6, 0],
+      [7, 0],
+      [8, 0],
+    ])
+    expect(c.slice(9).map((x) => [x.item, x.round])).toEqual([
+      [4, 1],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+      [8, 1],
+    ])
   })
 })

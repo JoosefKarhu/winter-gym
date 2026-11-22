@@ -89,6 +89,9 @@ the dates in `src/logic.test.ts` too.
 9. Rounding: barbell lifts 2.5 kg, dumbbells, plates and cables 1 kg. Pull-up added weight steps in
    2.5 kg like the barbell lifts.
 
+Session C part 2 (`kind: 'mobility'` items) runs as rounds: every stretch once, then all of them
+again, `sets` times.
+
 When rules overlap: deload, then the phase 4 drop, then the bad back rule, then normal progression.
 A red flag hides A and B until you clear it in Settings.
 

@@ -42,6 +42,8 @@ export interface SessionLog {
   index: number
   exercises: ExerciseLog[]
   notes: Record<string, string>
+  /** Running rest timer, saved so it survives the app being closed. */
+  rest?: { endsAt: number; total: number }
 }
 
 // ---------- dates ----------
@@ -355,4 +357,25 @@ export function phaseRanges(
     from: i === 0 && blockStart > iso(p.start) ? blockStart : iso(p.start),
     to: iso(p.end),
   }))
+}
+
+/** One screen of a session flow: an exercise, or one round of a mobility flow item. */
+export interface Step {
+  item: number
+  /** Set index this screen covers (mobility rounds); absent = all sets on one screen. */
+  round?: number
+  rounds?: number
+}
+
+/** Exercise screens in order. Mobility items run as rounds: all of them once, then again. */
+export function sessionSteps(type: SessionType): Step[] {
+  const items = sessions[type].items
+  const steps: Step[] = []
+  items.forEach((it, i) => it.kind !== 'mobility' && steps.push({ item: i }))
+  const flow = items.map((it, i) => ({ it, i })).filter((x) => x.it.kind === 'mobility')
+  const rounds = Math.max(0, ...flow.map((x) => x.it.sets))
+  for (let r = 0; r < rounds; r++) {
+    for (const { it, i } of flow) if (r < it.sets) steps.push({ item: i, round: r, rounds })
+  }
+  return steps
 }

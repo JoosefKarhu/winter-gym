@@ -50,9 +50,6 @@ export function ExercisePhoto({
         loading={lazy ? 'lazy' : 'eager'}
         className={`block h-auto rounded-2xl bg-white ${single ? 'mx-auto w-1/2' : 'w-full'}`}
       />
-      {ex.photoNote && !alt && (
-        <figcaption className="mt-1.5 text-[15px] text-muted">{ex.photoNote}</figcaption>
-      )}
     </figure>
   )
 }
@@ -86,7 +83,7 @@ function ExerciseCard({ id, dose, note }: { id: string; dose: string; note?: str
       )}
       {ex.cues && (
         <div className="-mx-3">
-          <Cues cues={ex.cues} />
+          <Cues cues={ex.cues} note={ex.photoNote} />
         </div>
       )}
     </article>
